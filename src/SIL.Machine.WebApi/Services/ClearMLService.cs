@@ -2,6 +2,7 @@
 
 public class ClearMLService : IClearMLService
 {
+    private string _token = string.Empty; // Expires every 30 days
     private readonly HttpClient _httpClient;
     private readonly IOptionsMonitor<ClearMLOptions> _options;
     private static readonly JsonNamingPolicy JsonNamingPolicy = new SnakeCaseJsonNamingPolicy();
@@ -210,7 +211,16 @@ public class ClearMLService : IClearMLService
         };
         var authenticationString = $"{_options.CurrentValue.AccessKey}:{_options.CurrentValue.SecretKey}";
         var base64EncodedAuthenticationString = Convert.ToBase64String(Encoding.ASCII.GetBytes(authenticationString));
-        request.Headers.Add("Authorization", $"Basic {base64EncodedAuthenticationString}");
+        if (string.IsNullOrEmpty(_token))
+        {
+            var authRequest = new HttpRequestMessage(HttpMethod.Get, $"{_options.CurrentValue.ApiServer}/auth.login");
+            authRequest.Headers.Add("Authorization", $"Basic {base64EncodedAuthenticationString}");
+            HttpResponseMessage authResponse = await _httpClient.SendAsync(authRequest, cancellationToken);
+            string authResult = await authResponse.Content.ReadAsStringAsync(cancellationToken);
+            _token = ((JsonObject?)JsonNode.Parse(authResult))?["data"]?["token"]?.ToString() ?? string.Empty;
+        }
+
+        request.Headers.Add("Authorization", $"Bearer {_token}");
         HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
         string result = await response.Content.ReadAsStringAsync();
         return (JsonObject?)JsonNode.Parse(result);
