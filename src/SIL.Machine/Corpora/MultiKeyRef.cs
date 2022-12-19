@@ -29,7 +29,10 @@ namespace SIL.Machine.Corpora
             {
                 object key = Keys[i];
                 object otherKey = other.Keys[i];
-                res = Comparer<object>.Default.Compare(key, otherKey);
+                if (key is string || otherKey is string)
+                    res = Comparer<object>.Default.Compare(key as string, otherKey as string);
+                else
+                    res = Comparer<object>.Default.Compare(key, otherKey);
                 if (res != 0)
                     return res;
             }
